@@ -1,0 +1,26 @@
+{
+  "name": "live-template",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/bun": "^1.1.2",
+    "@types/node": "^20.12.12",
+    "@types/nunjucks": "^3.2.6",
+    "@types/uuid": "^9.0.8",
+    "chardet": "^2.0.0",
+    "commander": "^12.0.0",
+    "iconv-lite": "^0.6.3",
+    "nunjucks": "^3.2.4",
+    "simple-git": "^3.24.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5",
+    "uuid": "^9.0.1"
+  }
+}
