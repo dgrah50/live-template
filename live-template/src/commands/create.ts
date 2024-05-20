@@ -3,6 +3,7 @@ import * as path from "path";
 import { templatingEngine } from "../utils/templating";
 import simpleGit, { type SimpleGit } from "simple-git";
 import { generateCruftJson, parseCruftJson } from "../utils/cruftJson";
+import { getTmpDir } from "../utils/getTmpDir";
 
 interface CreateOptions {
   outputDir: string;
@@ -33,8 +34,9 @@ export async function create(
     skip,
   } = options;
 
-  await gitClient.clone(templateGitUrl, outputDir, { "--depth": "1" });
-  await gitClient.cwd(outputDir);
+  const workingDir = getTmpDir();
+  await gitClient.clone(templateGitUrl, workingDir, { "--depth": "1" });
+  await gitClient.cwd(workingDir);
 
   if (checkout) {
     await gitClient.checkout(checkout);
@@ -67,22 +69,11 @@ export async function create(
     // Implement prompt for template variables if needed
   }
 
-  // Generate project files
-  const templateFiles = fs
-    .readdirSync(outputDir || ".", {
-      withFileTypes: true,
-    })
-    .filter((dirent) => dirent.isFile())
-    .map((dirent) => dirent.name);
-
-  for (const file of templateFiles) {
-    const filePath = path.join(outputDir || ".", file);
-
-    const renderedContent = templatingEngine.renderFile(filePath, context);
-
-    const outputFilePath = path.join(outputDir, file);
-    fs.writeFileSync(outputFilePath, renderedContent);
-  }
+  templatingEngine.renderGitTemplateDirToNewOutputDir(
+    workingDir,
+    outputDir,
+    context
+  );
 
   // Save cruft state
   const cruftContent = {

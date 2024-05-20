@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import chardet from "chardet";
 import iconv from "iconv-lite";
+import type { SimpleGit } from "simple-git";
 
 class TemplatingEngine {
   private env: nunjucks.Environment;
@@ -24,20 +25,45 @@ class TemplatingEngine {
     this.supportedExtensions = [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"]; // List of supported JS-related extensions
   }
 
-  render(template: string, context: object): string {
+  renderTemplateFromString(template: string, context: object): string {
     return this.env.renderString(template, context);
   }
 
-  renderFile(templatePath: string, context: object): string {
-    const extension = path.extname(templatePath);
+  renderTemplateFromFile(templatePath: string, context: object): string {
     const fileBuffer = fs.readFileSync(templatePath);
     const encoding = chardet.detect(fileBuffer) || "utf-8";
     const fileContent = iconv.decode(fileBuffer, encoding);
 
     if (encoding === "utf-8" || encoding === "ISO-8859-1") {
-      return this.render(fileContent, context);
+      return this.renderTemplateFromString(fileContent, context);
     } else {
       return fileContent;
+    }
+  }
+
+  renderGitTemplateDirToNewOutputDir(
+    inputDir: string,
+    outputDir: string,
+    context: object
+  ) {
+    // Generate project files
+    const templateFiles = fs
+      .readdirSync(inputDir || ".", {
+        withFileTypes: true,
+      })
+      .filter((dirent) => dirent.isFile())
+      .map((dirent) => dirent.name);
+
+    for (const file of templateFiles) {
+      const filePath = path.join(inputDir || ".", file);
+
+      const renderedContent = templatingEngine.renderTemplateFromFile(
+        filePath,
+        context
+      );
+
+      const outputFilePath = path.join(outputDir, file);
+      fs.writeFileSync(outputFilePath, renderedContent);
     }
   }
 }

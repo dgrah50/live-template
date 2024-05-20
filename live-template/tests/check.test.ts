@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { expect, test, mock } from "bun:test";
 import { check } from "../src/commands/check";
-import { setupProjectDir } from "./conftest";
+import { setupProjectDir } from "./setupProjectDir";
 import simpleGit, { type SimpleGit } from "simple-git";
 
 test("check with no .cruft.json", async () => {

@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { diff } from "../src/commands/diff";
 import { expect, test } from "bun:test";
-import { setupProjectDir } from "./conftest";
+import { setupProjectDir } from "./setupProjectDir";
 
 test("diff with no .cruft.json", async () => {
   const projectDir = setupProjectDir();

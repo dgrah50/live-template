@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-interface CruftJson {
+export interface CruftJson {
   template: string;
   commit: string;
   context: {

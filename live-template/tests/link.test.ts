@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { setupProjectDir } from "./conftest";
+import { setupProjectDir } from "./setupProjectDir";
 import { link } from "../src/commands/link";
 import { expect, test } from "bun:test";
 

@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { setupProjectDir } from "./conftest";
+import { setupProjectDir } from "./setupProjectDir";
 import { create } from "../src/commands/create";
 import { expect, test } from "bun:test";
 import { simpleGit } from "simple-git";
@@ -18,11 +18,11 @@ test("create project", async () => {
     fs.mkdirSync(outputDir);
   }
 
-  const git = simpleGit({ baseDir: getTmpDir() });
+  const gitClient = simpleGit({ baseDir: getTmpDir() });
 
   const PROJECT_NAME = randomUUID();
 
-  await create(templateGitUrl, git, {
+  await create(templateGitUrl, gitClient, {
     outputDir,
     extraContext: {
       project_name: PROJECT_NAME,

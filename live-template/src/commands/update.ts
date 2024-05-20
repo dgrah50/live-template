@@ -1,65 +1,115 @@
-import * as fs from "fs";
-import * as path from "path";
-import { templatingEngine } from "../utils/templating";
-import simpleGit from "simple-git";
-import { parseCruftJson } from "../utils/cruftJson";
+import { type SimpleGit } from "simple-git";
 
-export async function update(options: any): Promise<void> {
+import { parseCruftJson, generateCruftJson } from "../utils/cruftJson";
+import {
+  validateExtraContextFile,
+  mergeExtraContext,
+  ensureProjectRepoClean,
+  getLastCommitHash,
+  isProjectUpdated,
+  generateProjectToDirectory,
+  applyProjectUpdates,
+} from "../utils/updateUtils";
+import { getTmpDir } from "../utils/getTmpDir";
+
+interface UpdateOptions {
+  outputDir: string;
+  skipApplyAsk?: boolean;
+  skipUpdate?: boolean;
+  checkout?: string;
+  strict?: boolean;
+  allowUntrackedFiles?: boolean;
+  extraContext?: Record<string, any>;
+  extraContextFile?: string;
+}
+
+export async function update(
+  gitClient: SimpleGit,
+  options: UpdateOptions
+): Promise<boolean> {
   const {
-    projectDir,
-    cookiecutterInput,
-    refreshPrivateVariables,
-    skipApplyAsk,
-    skipUpdate,
+    outputDir,
+    skipApplyAsk = true,
+    skipUpdate = false,
     checkout,
-    strict,
-    allowUntrackedFiles,
+    strict = true,
+    allowUntrackedFiles = false,
     extraContext,
     extraContextFile,
   } = options;
 
-  const cruftState = parseCruftJson(projectDir);
+  try {
+    // Update specified project's cruft to the latest and greatest release.
+    const cruftState = parseCruftJson(outputDir);
 
-  const git = simpleGit();
-  await git.clone(cruftState.template, "tmp-repo", { "--depth": "1" });
-  await git.cwd("tmp-repo");
+    // These are the new variables from the command line that can be used to override the old variables when updating
+    if (extraContextFile) {
+      validateExtraContextFile(extraContextFile, outputDir);
+      mergeExtraContext(extraContextFile, cruftState, extraContext);
+    }
 
-  if (checkout) {
-    await git.checkout(checkout);
+    // If the project dir is a git repository, we ensure
+    // that the user has a clean working directory before proceeding
+    await ensureProjectRepoClean(gitClient, outputDir, allowUntrackedFiles);
+
+    const repoDir = getTmpDir();
+
+    // Clone the template
+    await gitClient.clone(cruftState.template, repoDir, {
+      "--depth": "1",
+    });
+    await gitClient.cwd(repoDir);
+
+    const startHash = cruftState.commit;
+    const latestHash = await getLastCommitHash(gitClient);
+
+    if (
+      !extraContext &&
+      (await isProjectUpdated(gitClient, cruftState.commit, latestHash, strict))
+    ) {
+      console.log("Nothing to do, the project already up to date!");
+      return Promise.resolve(false);
+    }
+
+    const generatedProjectAtStartHashDirectory =
+      await generateProjectToDirectory(
+        gitClient,
+        cruftState.template,
+        startHash
+      );
+
+    const generatedProjectAtLatestHashDirectory =
+      await generateProjectToDirectory(
+        gitClient,
+        cruftState.template,
+        latestHash
+      );
+
+    if (extraContext) {
+      Object.assign(cruftState.context.nunjucks, extraContext);
+    }
+
+    if (
+      await applyProjectUpdates({
+        gitClient,
+        currentTemplateDir: generatedProjectAtStartHashDirectory,
+        newTemplateDir: generatedProjectAtLatestHashDirectory,
+        projectDir: outputDir,
+        skipUpdate,
+        skipApplyAsk,
+        allowUntrackedFiles,
+      })
+    ) {
+      cruftState.commit = latestHash;
+      cruftState.checkout = checkout;
+      generateCruftJson(outputDir, cruftState);
+      console.log(
+        "Good work! Project's cruft has been updated and is as clean as possible!"
+      );
+    }
+
+    return Promise.resolve(true);
+  } catch (error) {
+    return Promise.reject(error);
   }
-
-  const lastCommit = (await git.log(["-n", "1"])).latest?.hash;
-  if (lastCommit == undefined) {
-    throw new Error("No commit found in the repository");
-  }
-
-  const context = JSON.parse(extraContext);
-  if (extraContextFile && fs.existsSync(extraContextFile)) {
-    const fileContext = JSON.parse(fs.readFileSync(extraContextFile, "utf8"));
-    Object.assign(context, fileContext);
-  }
-
-  if (!cookiecutterInput) {
-    // Implement prompt for template variables if needed
-  }
-
-  // Placeholder for update logic
-  const templateFiles = fs.readdirSync(cruftState.directory || ".");
-
-  for (const file of templateFiles) {
-    const filePath = path.join(cruftState.directory || ".", file);
-    const fileContent = fs.readFileSync(filePath, "utf8");
-    const renderedContent = templatingEngine.render(fileContent, context);
-    const outputFilePath = path.join(projectDir, file);
-    fs.writeFileSync(outputFilePath, renderedContent);
-  }
-
-  // Save updated cruft state
-  cruftState.commit = lastCommit;
-  cruftState.checkout = checkout;
-  cruftState.context = { nunjucks: context };
-  fs.writeFileSync(
-    path.join(projectDir, ".cruft.json"),
-    JSON.stringify(cruftState, null, 2)
-  );
 }
